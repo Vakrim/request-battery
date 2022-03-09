@@ -1,3 +1,5 @@
+mod response_asserter;
+
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, read_dir, OpenOptions},
@@ -37,13 +39,13 @@ async fn run_test_case(
 
     let result = make_test_case_request(config.url).await?;
 
-    let mut resultLog = OpenOptions::new().append(true).create(true).open(
+    let mut result_log = OpenOptions::new().append(true).create(true).open(
         Path::new("test-cases")
             .join(test_case_file_name)
             .with_extension("log"),
     ).unwrap();
 
-    resultLog.write_all(format!("{}, {}\n", result.status, result.time).as_bytes()).unwrap();
+    result_log.write_all(format!("{}, {}\n", result.status, result.time).as_bytes()).unwrap();
 
     return Ok(());
 }
@@ -52,8 +54,12 @@ async fn make_test_case_request(url: String) -> Result<TestCaseRunResult, reqwes
     let now = Instant::now();
     let response = reqwest::get(url).await?;
 
+    let status = response.status();
+
+    response_asserter::assert_response(vec![], response.text().await?);
+
     Ok(TestCaseRunResult {
-        status: response.status().as_u16(),
+        status: status.as_u16(),
         time: now.elapsed().as_millis() as f32 / 1000.0,
     })
 }
