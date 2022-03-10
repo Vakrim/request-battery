@@ -1,11 +1,10 @@
-mod response_asserter;
+mod request;
 
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, read_dir, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    time::Instant,
 };
 
 #[tokio::main]
@@ -38,7 +37,7 @@ async fn run_test_case(
 ) -> Result<(), reqwest::Error> {
     println!("Running {}", config.name);
 
-    let result = make_test_case_request(config.url).await?;
+    let result = request::make_test_case_request(config.url).await?;
 
     let mut result_log = OpenOptions::new()
         .append(true)
@@ -63,27 +62,7 @@ async fn run_test_case(
     return Ok(());
 }
 
-async fn make_test_case_request(url: String) -> Result<TestCaseRunResult, reqwest::Error> {
-    let now = Instant::now();
-    let response = reqwest::get(url).await?;
 
-    let status = response.status();
-
-    let assers_results = response_asserter::assert_response(vec![], response.text().await?);
-
-    Ok(TestCaseRunResult {
-        status: status.as_u16(),
-        time: now.elapsed().as_millis() as f32 / 1000.0,
-        assert_results: assers_results,
-    })
-}
-
-#[derive(Debug)]
-struct TestCaseRunResult {
-    status: u16,
-    time: f32,
-    assert_results: String,
-}
 
 fn get_test_cases() -> Result<Vec<String>, String> {
     let dir = read_dir("test-cases").or(Err("Couldn't find test case dir".to_string()))?;
