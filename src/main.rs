@@ -3,8 +3,9 @@ mod response_asserter;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, read_dir, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
-    time::Instant, io::Write,
+    time::Instant,
 };
 
 #[tokio::main]
@@ -39,13 +40,25 @@ async fn run_test_case(
 
     let result = make_test_case_request(config.url).await?;
 
-    let mut result_log = OpenOptions::new().append(true).create(true).open(
-        Path::new("test-cases")
-            .join(test_case_file_name)
-            .with_extension("log"),
-    ).unwrap();
+    let mut result_log = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(
+            Path::new("test-cases")
+                .join(test_case_file_name)
+                .with_extension("log"),
+        )
+        .unwrap();
 
-    result_log.write_all(format!("{}, {}\n", result.status, result.time).as_bytes()).unwrap();
+    result_log
+        .write_all(
+            format!(
+                "{}, {}, {}\n",
+                result.status, result.time, result.assert_results
+            )
+            .as_bytes(),
+        )
+        .unwrap();
 
     return Ok(());
 }
@@ -56,11 +69,12 @@ async fn make_test_case_request(url: String) -> Result<TestCaseRunResult, reqwes
 
     let status = response.status();
 
-    response_asserter::assert_response(vec![], response.text().await?);
+    let assers_results = response_asserter::assert_response(vec![], response.text().await?);
 
     Ok(TestCaseRunResult {
         status: status.as_u16(),
         time: now.elapsed().as_millis() as f32 / 1000.0,
+        assert_results: assers_results,
     })
 }
 
@@ -68,6 +82,7 @@ async fn make_test_case_request(url: String) -> Result<TestCaseRunResult, reqwes
 struct TestCaseRunResult {
     status: u16,
     time: f32,
+    assert_results: String,
 }
 
 fn get_test_cases() -> Result<Vec<String>, String> {
