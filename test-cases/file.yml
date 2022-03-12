@@ -1,3 +1,5 @@
 name: Todo 1
 url: https://jsonplaceholder.typicode.com/todos/1
 data: ""
+assertions:
+  - ExactMatch: title

@@ -1,15 +1,20 @@
 mod response_asserter;
 
-use std::time::Instant;
 use reqwest::Error;
+use std::time::Instant;
 
-pub async fn make_test_case_request(url: String) -> Result<TestCaseRunResult, Error> {
+use crate::TestCase;
+
+pub async fn make_test_case_request(
+    test_case_config: &TestCase,
+) -> Result<TestCaseRunResult, Error> {
     let now = Instant::now();
-    let response = reqwest::get(url).await?;
+    let response = reqwest::get(test_case_config.url.clone()).await?;
 
     let status = response.status();
 
-    let assers_results = response_asserter::assert_response(vec![], response.text().await?);
+    let assers_results =
+        response_asserter::assert_response(&test_case_config.assertions, response.text().await?);
 
     Ok(TestCaseRunResult {
         status: status.as_u16(),
