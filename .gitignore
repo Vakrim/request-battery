@@ -1,2 +1,4 @@
 /target
-/test-cases/*
+/test-runs
+/test-summaries
+test-cases.yaml

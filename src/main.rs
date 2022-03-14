@@ -1,10 +1,19 @@
 mod request;
 mod test_case_file;
 
+use chrono::Local;
 use request::create_client;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::OpenOptions, io::Write, path::Path};
-use test_case_file::{get_test_cases, read_test_case_file};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fs::{create_dir_all, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+};
+use test_case_file::read_test_cases_file;
+
+use crate::test_case_file::to_path_name;
 
 #[tokio::main]
 async fn main() {
@@ -13,60 +22,63 @@ async fn main() {
             println!("Finished");
         }
         Err(reason) => {
-            println!("Error parsing file: {}", reason);
+            println!("Error running test cases: {}", reason);
         }
     }
 }
 
-async fn run_test_cases_batch() -> Result<(), String> {
-    let test_cases = get_test_cases()?;
+async fn run_test_cases_batch() -> Result<(), Box<dyn Error>> {
+    let test_cases = read_test_cases_file()?;
 
     let request_client = create_client();
 
-    for test_case_file_name in test_cases {
-        let config = read_test_case_file(Path::new("test-cases").join(&test_case_file_name))?;
+    create_dir_all(Path::new("test-summaries"))?;
 
-        run_test_case(config, test_case_file_name, &request_client)
-            .await
-            .unwrap();
+    for test_case in test_cases {
+        run_test_case(test_case, &request_client).await?;
     }
 
     return Ok(());
 }
 
 async fn run_test_case(
-    config: TestCase,
-    test_case_file_name: String,
+    test_case: TestCase,
     client: &reqwest::Client,
-) -> Result<(), reqwest::Error> {
-    println!("Running {}", config.name);
+) -> Result<(), Box<dyn Error>> {
+    println!("Running {}", test_case.name);
 
-    let result = request::make_test_case_request(&config, client).await?;
+    let result = request::make_test_case_request(&test_case, client).await?;
+
+    let test_runs_dir_path = PathBuf::new()
+        .join("test-runs")
+        .join(to_path_name(&test_case.name));
+
+    create_dir_all(test_runs_dir_path.as_path())?;
 
     let mut last_result = OpenOptions::new()
         .write(true)
-        .truncate(true)
         .create(true)
         .open(
-            Path::new("test-cases")
-                .join(test_case_file_name.clone())
-                .with_extension("txt"),
+            test_runs_dir_path.join(
+                (&Local::now()
+                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+                    .replace("T", "   ")
+                    .replace(":", "-")[0..21])
+                    .to_string()
+                    + ".json",
+            ),
         )
         .unwrap();
 
     last_result.write_all(result.body.as_bytes()).unwrap();
 
-    let mut log_file = OpenOptions::new()
+    let mut summary_file = OpenOptions::new()
         .append(true)
         .create(true)
-        .open(
-            Path::new("test-cases")
-                .join(test_case_file_name)
-                .with_extension("log"),
-        )
+        .open(Path::new("test-summaries").join(to_path_name(&test_case.name) + ".log"))
         .unwrap();
 
-    log_file
+    summary_file
         .write_all(
             format!(
                 "{}, {}, {}\n",

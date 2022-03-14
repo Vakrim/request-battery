@@ -1,10 +1,15 @@
-use std::fs::{self, read_dir};
+use std::{
+    fs::{self},
+    path::Path,
+};
+
+use regex::Regex;
 
 use super::TestCase;
 
-use std::path::PathBuf;
+pub fn read_test_cases_file() -> Result<Vec<TestCase>, String> {
+    let path = Path::new("test-cases.yaml");
 
-pub fn read_test_case_file(path: PathBuf) -> Result<TestCase, String> {
     let file = fs::read_to_string(path).or(Err("Couldn't open file".to_string()))?;
 
     match serde_yaml::from_str(&file) {
@@ -17,20 +22,23 @@ pub fn read_test_case_file(path: PathBuf) -> Result<TestCase, String> {
     }
 }
 
-pub fn get_test_cases() -> Result<Vec<String>, String> {
-    let dir = read_dir("test-cases").or(Err("Couldn't open test cases dir".to_string()))?;
+pub fn to_path_name(name: &str) -> String {
+    Regex::new(r"[\W]")
+        .unwrap()
+        .replace_all(name, "-")
+        .to_lowercase()
+}
 
-    let mut names = Vec::new();
+#[cfg(test)]
+mod test {
 
-    for d in dir {
-        let d = d.or(Err("".to_string()))?;
+    use super::*;
 
-        let name = d.file_name().to_string_lossy().to_string();
-
-        if name.ends_with(".yml") || name.ends_with(".yaml") {
-            names.push(name);
-        }
+    #[test]
+    fn it_normalizes_paths_to_letters_and_dashes() {
+        assert_eq!(
+            to_path_name("This is a test case name"),
+            "this-is-a-test-case-name"
+        );
     }
-
-    return Ok(names);
 }
