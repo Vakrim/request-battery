@@ -1,5 +1,6 @@
 mod response_asserter;
 
+use chrono::Local;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Error, Method,
@@ -46,6 +47,7 @@ pub async fn make_test_case_request(
         response_asserter::assert_response(&test_case_config.assertions, body.clone());
 
     Ok(TestCaseRunResult {
+        name: run_name(),
         status: status.as_u16(),
         time: now.elapsed().as_millis() as f32 / 1000.0,
         assert_results: assers_results,
@@ -67,8 +69,17 @@ fn normalize_method(method: &CreateMethod) -> Method {
     }
 }
 
+fn run_name() -> String {
+    (Local::now()
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+        .replace("T", "   ")
+        .replace(":", "-")[0..21])
+        .to_string()
+}
+
 #[derive(Debug)]
 pub struct TestCaseRunResult {
+    pub name: String,
     pub status: u16,
     pub time: f32,
     pub assert_results: String,

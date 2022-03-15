@@ -2,7 +2,6 @@ mod environment_config;
 mod request;
 mod test_case_file;
 
-use chrono::Local;
 use environment_config::get_environment_variables;
 use request::create_client;
 use serde::{Deserialize, Serialize};
@@ -53,29 +52,14 @@ async fn run_test_case(
 
     let result = request::make_test_case_request(&test_case, client).await?;
 
-    let test_runs_dir_path = PathBuf::new()
-        .join("test-runs")
-        .join(to_path_name(&test_case.name));
+    save_response(&test_case, &result);
 
-    create_dir_all(test_runs_dir_path.as_path())?;
+    save_summary(test_case, result);
 
-    let mut last_result = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(
-            test_runs_dir_path.join(
-                (&Local::now()
-                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
-                    .replace("T", "   ")
-                    .replace(":", "-")[0..21])
-                    .to_string()
-                    + ".json",
-            ),
-        )
-        .unwrap();
+    return Ok(());
+}
 
-    last_result.write_all(result.body.as_bytes()).unwrap();
-
+fn save_summary(test_case: TestCase, result: request::TestCaseRunResult) {
     let mut summary_file = OpenOptions::new()
         .append(true)
         .create(true)
@@ -85,14 +69,28 @@ async fn run_test_case(
     summary_file
         .write_all(
             format!(
-                "{}, {}, {}\n",
-                result.status, result.time, result.assert_results
+                "{}, {}, {}, {}\n",
+                result.status, result.time, result.name, result.assert_results
             )
             .as_bytes(),
         )
         .unwrap();
+}
 
-    return Ok(());
+fn save_response(test_case: &TestCase, result: &request::TestCaseRunResult) {
+    let test_runs_dir_path = PathBuf::new()
+        .join("test-runs")
+        .join(to_path_name(&test_case.name));
+
+    create_dir_all(test_runs_dir_path.as_path()).expect("Could not create test runs directory");
+
+    let mut last_result = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(test_runs_dir_path.join(test_case.name.clone() + ".json"))
+        .unwrap();
+
+    last_result.write_all(result.body.as_bytes()).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize)]
