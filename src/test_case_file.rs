@@ -1,23 +1,30 @@
 use std::{
+    collections::HashMap,
+    error::Error,
     fs::{self},
     path::Path,
 };
 
+use super::TestCase;
 use regex::Regex;
 
-use super::TestCase;
-
-pub fn read_test_cases_file() -> Result<Vec<TestCase>, String> {
+pub fn read_test_cases_file(
+    variables: HashMap<String, String>,
+) -> Result<Vec<TestCase>, Box<dyn Error>> {
     let path = Path::new("test-cases.yaml");
 
-    let file = fs::read_to_string(path).or(Err("Couldn't open file".to_string()))?;
+    let mut file = fs::read_to_string(path)?;
+
+    for (key, val) in variables.iter() {
+        file = file.replace(&format!("${{{key}}}", key = key), val);
+    }
 
     match serde_yaml::from_str(&file) {
         Ok(data) => {
             return Ok(data);
         }
         Err(error) => {
-            return Err(error.to_string());
+            return Err(error.into());
         }
     }
 }

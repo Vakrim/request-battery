@@ -1,7 +1,9 @@
+mod environment_config;
 mod request;
 mod test_case_file;
 
 use chrono::Local;
+use environment_config::get_environment_variables;
 use request::create_client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -28,7 +30,9 @@ async fn main() {
 }
 
 async fn run_test_cases_batch() -> Result<(), Box<dyn Error>> {
-    let test_cases = read_test_cases_file()?;
+    let environemnt_variables = get_environment_variables();
+
+    let test_cases = read_test_cases_file(environemnt_variables)?;
 
     let request_client = create_client();
 
