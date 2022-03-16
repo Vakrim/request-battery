@@ -87,7 +87,7 @@ fn save_response(test_case: &TestCase, result: &request::TestCaseRunResult) {
     let mut last_result = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(test_runs_dir_path.join(test_case.name.clone() + ".json"))
+        .open(test_runs_dir_path.join(result.name.clone() + ".json"))
         .unwrap();
 
     last_result.write_all(result.body.as_bytes()).unwrap();
